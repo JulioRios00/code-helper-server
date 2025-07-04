@@ -70,6 +70,7 @@ def register():
             return jsonify(result), 400
             
     except Exception as e:
+        print("Erro no /register:", str(e))
         return jsonify({'error': 'Erro interno do servidor'}), 500
 
 @auth_bp.route('/login', methods=['POST'])
@@ -79,30 +80,29 @@ def login():
     
     Body:
     {
-        "username": "string",
+        "email": "string",
         "password": "string"
     }
     """
     try:
         data = request.get_json()
         if not data:
-            return jsonify({'error': 'Dados JSON necessários'}), 400
+            return jsonify({'error': 'JSON Data necessary'}), 400
         
-        username = data.get('username', '').strip()
+        email = data.get('email', '').strip()
         password = data.get('password', '')
         
-        if not username or not password:
-            return jsonify({'error': 'Username e password são obrigatórios'}), 400
+        if not email or not password:
+            return jsonify({'error': 'Email e password are required'}), 400
         
         auth_service = AuthService()
-        success, result = auth_service.login(username, password)
+        success, result = auth_service.login(email, password)
         
         if success:
             return jsonify(result), 200
         else:
-            # Verificar se é erro de assinatura expirada
             if result.get('code') == 'SUBSCRIPTION_EXPIRED':
-                return jsonify(result), 402  # Payment Required
+                return jsonify(result), 402
             else:
                 return jsonify(result), 401
                 

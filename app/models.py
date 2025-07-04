@@ -1,227 +1,124 @@
-import sqlite3
 import hashlib
 import uuid
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
-import os
+from supabase import create_client, Client
+
 
 class DatabaseManager:
-    """Gerenciador de conexão com o banco de dados"""
-    
-    def __init__(self, db_path: str):
-        self.db_path = db_path
-        self._ensure_database_exists()
-        self._create_tables()
-    
-    def _ensure_database_exists(self):
-        """Garante que o diretório do banco existe"""
-        os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
-    
-    def get_connection(self):
-        """Retorna uma conexão com o banco"""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row  # Para acessar colunas por nome
-        return conn
-    
-    def _create_tables(self):
-        """Cria as tabelas necessárias"""
-        with self.get_connection() as conn:
-            # Tabela de usuários
-            conn.execute('''
-                CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username TEXT UNIQUE NOT NULL,
-                    email TEXT UNIQUE NOT NULL,
-                    password_hash TEXT NOT NULL,
-                    subscription_end_date TEXT,
-                    is_active BOOLEAN DEFAULT 1,
-                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    updated_at TEXT DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            # Tabela de tokens ativos
-            conn.execute('''
-                CREATE TABLE IF NOT EXISTS active_tokens (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    token_id TEXT UNIQUE NOT NULL,
-                    expires_at TEXT NOT NULL,
-                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (user_id) REFERENCES users (id)
-                )
-            ''')
-            
-            conn.commit()
+    """Supabase connection manager"""
+
+    def __init__(self, url: str, key: str):
+        self.supabase: Client = create_client(url, key)
+
+    def get_connection(self) -> Client:
+        return self.supabase
+
 
 class User:
-    """Modelo de usuário"""
-    
-    def __init__(self, db_manager: DatabaseManager):
-        self.db = db_manager
-    
+    def __init__(self, db: DatabaseManager):
+        self.db = db
+
     @staticmethod
     def hash_password(password: str) -> str:
-        """Gera hash da senha"""
         return hashlib.sha256(password.encode()).hexdigest()
-    
-    def create_user(self, username: str, email: str, password: str, 
-                   subscription_months: int = 1) -> Dict[str, Any]:
-        """Cria um novo usuário"""
+
+    def create_user(self, username: str, email: str, password: str, subscription_months: int = 1) -> Dict[str, Any]:
         password_hash = self.hash_password(password)
         subscription_end = datetime.now() + timedelta(days=30 * subscription_months)
-        
+
         try:
-            with self.db.get_connection() as conn:
-                cursor = conn.execute('''
-                    INSERT INTO users (username, email, password_hash, subscription_end_date)
-                    VALUES (?, ?, ?, ?)
-                ''', (username, email, password_hash, subscription_end.isoformat()))
-                
-                user_id = cursor.lastrowid
-                conn.commit()
-                
-                return {
-                    'id': user_id,
-                    'username': username,
-                    'email': email,
-                    'subscription_end_date': subscription_end.isoformat(),
-                    'is_active': True
-                }
-        except sqlite3.IntegrityError as e:
-            if 'username' in str(e):
-                raise ValueError("Nome de usuário já existe")
-            elif 'email' in str(e):
-                raise ValueError("Email já está em uso")
-            else:
-                raise ValueError("Erro ao criar usuário")
-    
+            data = {
+                "username": username,
+                "email": email,
+                "password_hash": password_hash,
+                "subscription_end_date": subscription_end.isoformat(),
+                "is_active": True,
+                "updated_at": datetime.now().isoformat(),
+                "created_at": datetime.now().isoformat()
+            }
+
+            conn = self.db.get_connection()
+            res = conn.table("users").insert(data).execute()
+            return res.data[0] if res.data else {}
+
+        except Exception as e:
+            error_str = str(e).lower()
+            if "duplicate" in error_str or "unique" in error_str:
+                raise ValueError("Usuário ou email já existe")
+            raise ValueError(f"Erro ao criar usuário: {str(e)}")
+
     def authenticate(self, username: str, password: str) -> Optional[Dict[str, Any]]:
-        """Autentica um usuário"""
         password_hash = self.hash_password(password)
-        
-        with self.db.get_connection() as conn:
-            cursor = conn.execute('''
-                SELECT id, username, email, subscription_end_date, is_active
-                FROM users 
-                WHERE username = ? AND password_hash = ? AND is_active = 1
-            ''', (username, password_hash))
-            
-            row = cursor.fetchone()
-            if row:
-                return dict(row)
-            return None
-    
+        conn = self.db.get_connection()
+        res = conn.table("users").select("*").eq("username", username).eq("password_hash", password_hash).eq("is_active", True).execute()
+        return res.data[0] if res.data else None
+
     def get_user_by_id(self, user_id: int) -> Optional[Dict[str, Any]]:
-        """Busca usuário por ID"""
-        with self.db.get_connection() as conn:
-            cursor = conn.execute('''
-                SELECT id, username, email, subscription_end_date, is_active
-                FROM users 
-                WHERE id = ?
-            ''', (user_id,))
-            
-            row = cursor.fetchone()
-            if row:
-                return dict(row)
-            return None
-    
+        conn = self.db.get_connection()
+        res = conn.table("users").select("*").eq("id", user_id).execute()
+        return res.data[0] if res.data else None
+
     def is_subscription_valid(self, user_id: int, grace_days: int = 3) -> bool:
-        """Verifica se a assinatura do usuário está válida"""
         user = self.get_user_by_id(user_id)
-        if not user or not user['is_active']:
+        if not user or not user.get('is_active'):
             return False
-        
-        if not user['subscription_end_date']:
+        end_date = user.get('subscription_end_date')
+        if not end_date:
             return False
-        
-        subscription_end = datetime.fromisoformat(user['subscription_end_date'])
-        grace_period_end = subscription_end + timedelta(days=grace_days)
-        
-        return datetime.now() <= grace_period_end
-    
+        end = datetime.fromisoformat(end_date)
+        return datetime.now() <= end + timedelta(days=grace_days)
+
     def extend_subscription(self, user_id: int, months: int) -> bool:
-        """Estende a assinatura do usuário"""
         user = self.get_user_by_id(user_id)
         if not user:
             return False
-        
+
         current_end = datetime.fromisoformat(user['subscription_end_date'])
-        # Se a assinatura já expirou, começa da data atual
-        if current_end < datetime.now():
-            new_end = datetime.now() + timedelta(days=30 * months)
-        else:
-            new_end = current_end + timedelta(days=30 * months)
-        
-        with self.db.get_connection() as conn:
-            conn.execute('''
-                UPDATE users 
-                SET subscription_end_date = ?, updated_at = CURRENT_TIMESTAMP
-                WHERE id = ?
-            ''', (new_end.isoformat(), user_id))
-            conn.commit()
-        
+        new_end = max(current_end, datetime.now()) + timedelta(days=30 * months)
+
+        conn = self.db.get_connection()
+        conn.table("users").update({"subscription_end_date": new_end.isoformat()}).eq("id", user_id).execute()
         return True
 
-class Token:
-    """Modelo de token"""
-    
-    def __init__(self, db_manager: DatabaseManager):
-        self.db = db_manager
-    
-    def store_token(self, user_id: int, token_id: str, expires_at: datetime) -> bool:
-        """Armazena um token ativo"""
-        try:
-            with self.db.get_connection() as conn:
-                conn.execute('''
-                    INSERT INTO active_tokens (user_id, token_id, expires_at)
-                    VALUES (?, ?, ?)
-                ''', (user_id, token_id, expires_at.isoformat()))
-                conn.commit()
-                return True
-        except sqlite3.Error:
-            return False
-    
-    def is_token_valid(self, token_id: str) -> bool:
-        """Verifica se um token está válido"""
-        with self.db.get_connection() as conn:
-            cursor = conn.execute('''
-                SELECT expires_at FROM active_tokens 
-                WHERE token_id = ?
-            ''', (token_id,))
-            
-            row = cursor.fetchone()
-            if not row:
-                return False
-            
-            expires_at = datetime.fromisoformat(row['expires_at'])
-            return datetime.now() <= expires_at
-    
-    def revoke_token(self, token_id: str) -> bool:
-        """Revoga um token"""
-        with self.db.get_connection() as conn:
-            cursor = conn.execute('''
-                DELETE FROM active_tokens WHERE token_id = ?
-            ''', (token_id,))
-            conn.commit()
-            return cursor.rowcount > 0
-    
-    def revoke_user_tokens(self, user_id: int) -> int:
-        """Revoga todos os tokens de um usuário"""
-        with self.db.get_connection() as conn:
-            cursor = conn.execute('''
-                DELETE FROM active_tokens WHERE user_id = ?
-            ''', (user_id,))
-            conn.commit()
-            return cursor.rowcount
-    
-    def cleanup_expired_tokens(self) -> int:
-        """Remove tokens expirados"""
-        current_time = datetime.now().isoformat()
-        with self.db.get_connection() as conn:
-            cursor = conn.execute('''
-                DELETE FROM active_tokens WHERE expires_at < ?
-            ''', (current_time,))
-            conn.commit()
-            return cursor.rowcount
 
+class Token:
+    def __init__(self, db: DatabaseManager):
+        self.db = db
+
+    def store_token(self, user_id: int, token_id: str, expires_at: datetime) -> bool:
+        try:
+            conn = self.db.get_connection()
+            conn.table("active_tokens").insert({
+                "user_id": user_id,
+                "token_id": token_id,
+                "expires_at": expires_at.isoformat(),
+                "created_at": datetime.now().isoformat()
+            }).execute()
+            return True
+        except Exception:
+            return False
+
+    def is_token_valid(self, token_id: str) -> bool:
+        conn = self.db.get_connection()
+        res = conn.table("active_tokens").select("expires_at").eq("token_id", token_id).execute()
+        if not res.data:
+            return False
+        expires_at = datetime.fromisoformat(res.data[0]['expires_at'])
+        return datetime.now() <= expires_at
+
+    def revoke_token(self, token_id: str) -> bool:
+        conn = self.db.get_connection()
+        res = conn.table("active_tokens").delete().eq("token_id", token_id).execute()
+        return res.count > 0
+
+    def revoke_user_tokens(self, user_id: int) -> int:
+        conn = self.db.get_connection()
+        res = conn.table("active_tokens").delete().eq("user_id", user_id).execute()
+        return res.count or 0
+
+    def cleanup_expired_tokens(self) -> int:
+        now = datetime.now().isoformat()
+        conn = self.db.get_connection()
+        res = conn.table("active_tokens").delete().lt("expires_at", now).execute()
+        return res.count or 0
