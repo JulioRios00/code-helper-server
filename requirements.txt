@@ -2,3 +2,4 @@ Flask
 PyJWT
 flask-cors
 gunicorn
+supabase
