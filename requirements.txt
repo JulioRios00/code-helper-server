@@ -1,4 +1,4 @@
 Flask
 PyJWT
 flask-cors
-
+gunicorn
