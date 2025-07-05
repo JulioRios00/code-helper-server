@@ -89,10 +89,14 @@ class AuthService:
             user_data = self.user_model.authenticate(email, password)
             if not user_data:
                 return False, {'error': 'Credenciais inválidas'}
+            
+            payload = self.jwt_handler.decode_token(user_data.session.access_token)['session_id']
 
-            res = self.token_model.store_token(
+            self.token_model.store_token(
                 user_id=user_data.user.id,
-                expires_at=user_data.session.expires_at
+                email=user_data.user.email,
+                expires_at=user_data.session.expires_at,
+                session_id=payload
             )
 
             return True, {
@@ -116,32 +120,33 @@ class AuthService:
             if not payload:
                 return False, {'error': 'Token inválido ou expirado'}
             
-            if not self.token_model.is_token_valid(payload['token_id']):
+            if not self.token_model.is_token_valid(payload['session_id']):
                 return False, {'error': 'Token revogado'}
 
-            user_data = self.user_model.get_user_by_id(payload['user_id'])
+            user_data = self.user_model.get_user_by_id(payload['email'])
             if not user_data or not user_data['is_active']:
                 return False, {'error': 'Usuário inativo'}
 
-            grace_days = current_app.config.get('SUBSCRIPTION_GRACE_DAYS', 3)
-            if not self.user_model.is_subscription_valid(user_data['id'], grace_days):
-                self.token_model.revoke_token(payload['token_id'])
-                return False, {
-                    'error': 'Assinatura expirada',
-                    'code': 'SUBSCRIPTION_EXPIRED',
-                    'subscription_end': user_data['subscription_end_date']
-                }
-
+            #grace_days = current_app.config.get('SUBSCRIPTION_GRACE_DAYS', 3)
+            #if not self.user_model.is_subscription_valid(user_data['email'], grace_days):
+            #    self.token_model.revoke_token(payload['session_id'])
+            #    return False, {
+            #        'error': 'Assinatura expirada',
+            #        'code': 'SUBSCRIPTION_EXPIRED',
+            #        'subscription_end': user_data['subscription_end_date']
+            #    }
+            
             return True, {
                 'valid': True,
                 'user': {
                     'id': user_data['id'],
-                    'username': user_data['username'],
+                    'name': user_data['name'],
+                    'surname': user_data['surname'],
                     'email': user_data['email'],
                     'subscription_end': user_data['subscription_end_date']
                 },
                 'token_info': {
-                    'token_id': payload['token_id'],
+                    #'token_id': payload['token_id'],
                     'issued_at': payload['iat'],
                     'expires_at': payload['exp']
                 }

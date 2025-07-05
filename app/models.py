@@ -86,13 +86,14 @@ class User:
         )
         return response if response else None
 
-    def get_user_by_id(self, user_id: int) -> Optional[Dict[str, Any]]:
+    def get_user_by_id(self, email: str) -> Optional[Dict[str, Any]]:
         conn = self.db.get_connection()
-        res = conn.table("users").select("*").eq("id", user_id).execute()
+        res = conn.table("users").select("*").eq("email", email).execute()
+        print(res)
         return res.data[0] if res.data else None
 
-    def is_subscription_valid(self, user_id: int, grace_days: int = 3) -> bool:
-        user = self.get_user_by_id(user_id)
+    def is_subscription_valid(self, email: str, grace_days: int = 3) -> bool:
+        user = self.get_user_by_id(email)
         if not user or not user.get('is_active'):
             return False
         end_date = user.get('subscription_end_date')
@@ -118,15 +119,16 @@ class Token:
     def __init__(self, db: DatabaseManager):
         self.db = db
 
-    def store_token(self, user_id: str, expires_at: datetime) -> bool:
+    def store_token(self, user_id: str, email: str, expires_at: datetime, session_id: str) -> bool:
         try:
             data = {
                 "user_id": user_id,
+                "email": email,
                 "expires_at": expires_at,
+                "session_id": session_id,
                 "created_at": datetime.now().isoformat()
             }
 
-            print(user_id, expires_at)
             conn = self.db.get_connection()
             conn.table("active_tokens").insert(data).execute()
             return True
@@ -134,18 +136,25 @@ class Token:
             print("Erro ao armazenar token:", e)
             return False
 
-    def is_token_valid(self, token_id: str) -> bool:
+    def is_token_valid(self, session_id: str) -> bool:
         conn = self.db.get_connection()
-        res = conn.table("active_tokens").select("expires_at").eq("token_id", token_id).execute()
+        res = conn.table("active_tokens").select("expires_at").eq("session_id", session_id).execute()
+
         if not res.data:
             return False
-        expires_at = datetime.fromisoformat(res.data[0]['expires_at'])
+
+        try:
+            expires_at = datetime.fromtimestamp(int(res.data[0]['expires_at']))
+        except Exception as e:
+            print("Erro ao converter expires_at:", e)
+            return False
+
         return datetime.now() <= expires_at
 
-    def revoke_token(self, token_id: str) -> bool:
+    def revoke_token(self, session_id: str) -> bool:
         conn = self.db.get_connection()
-        res = conn.table("active_tokens").delete().eq("token_id", token_id).execute()
-        return res.count > 0
+        res = conn.table("active_tokens").delete().eq("session_id", session_id).execute()
+        return (res.count or 0) > 0
 
     def revoke_user_tokens(self, user_id: int) -> int:
         conn = self.db.get_connection()
