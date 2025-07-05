@@ -1,5 +1,6 @@
 import jwt
 import uuid
+import base64
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
 from flask import current_app
@@ -53,21 +54,12 @@ class JWTHandler:
     
     @staticmethod
     def decode_token(token: str) -> Optional[Dict[str, Any]]:
-        """
-        Decodifica e valida um token JWT
-        
-        Args:
-            token: Token JWT para decodificar
-            
-        Returns:
-            Payload do token se válido, None caso contrário
-        """
         try:
+            #TODO - adicionar uma validação de secret
             payload = jwt.decode(
                 token,
-                current_app.config['JWT_SECRET_KEY'],
                 algorithms=['HS256'],
-                options={'verify_exp': True}
+                options={'verify_exp': True, "verify_signature": False}
             )
             return payload
         except jwt.ExpiredSignatureError:

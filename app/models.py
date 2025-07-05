@@ -24,12 +24,13 @@ class User:
     def hash_password(password: str) -> str:
         return hashlib.sha256(password.encode()).hexdigest()
 
-    def create_user(self, name: str, surname: str, email: str, password: str) -> Dict[str, Any]:
+    def create_user(self, user_id: str, name: str, surname: str, email: str, password: str) -> Dict[str, Any]:
         password_hash = self.hash_password(password)
         #subscription_end = datetime.now() + timedelta(days=30 * subscription_months)
 
         try:
             data = {
+                "user_id": user_id,
                 "name": name,
                 "surname": surname,
                 "email": email,
@@ -117,17 +118,20 @@ class Token:
     def __init__(self, db: DatabaseManager):
         self.db = db
 
-    def store_token(self, user_id: int, token_id: str, expires_at: datetime) -> bool:
+    def store_token(self, user_id: str, expires_at: datetime) -> bool:
         try:
-            conn = self.db.get_connection()
-            conn.table("active_tokens").insert({
+            data = {
                 "user_id": user_id,
-                "token_id": token_id,
-                "expires_at": expires_at.isoformat(),
+                "expires_at": expires_at,
                 "created_at": datetime.now().isoformat()
-            }).execute()
+            }
+
+            print(user_id, expires_at)
+            conn = self.db.get_connection()
+            conn.table("active_tokens").insert(data).execute()
             return True
-        except Exception:
+        except Exception as e:
+            print("Erro ao armazenar token:", e)
             return False
 
     def is_token_valid(self, token_id: str) -> bool:

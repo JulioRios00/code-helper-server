@@ -22,7 +22,7 @@ class AuthService:
         self.token_model = Token(self.db_manager)
         self.jwt_handler = JWTHandler()
 
-    def register_user(self, name: str, surname: str, email: str, password: str,) -> Tuple[bool, Dict[str, Any]]:
+    def register_user(self, user_id: str, name: str, surname: str, email: str, password: str,) -> Tuple[bool, Dict[str, Any]]:
         """Registra um novo usuário"""
         try:
             if not name or len(name) < 3:
@@ -38,6 +38,7 @@ class AuthService:
                 return False, {'error': 'Senha deve ter pelo menos 6 caracteres'}
 
             user_data = self.user_model.create_user(
+                user_id=user_id,
                 name=name,
                 surname=surname,
                 email=email,
@@ -89,9 +90,8 @@ class AuthService:
             if not user_data:
                 return False, {'error': 'Credenciais inválidas'}
 
-            self.token_model.store_token(
+            res = self.token_model.store_token(
                 user_id=user_data.user.id,
-                token_id=user_data.user.id,
                 expires_at=user_data.session.expires_at
             )
 
@@ -115,7 +115,7 @@ class AuthService:
             payload = self.jwt_handler.decode_token(token)
             if not payload:
                 return False, {'error': 'Token inválido ou expirado'}
-
+            
             if not self.token_model.is_token_valid(payload['token_id']):
                 return False, {'error': 'Token revogado'}
 
