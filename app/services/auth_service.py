@@ -82,38 +82,27 @@ class AuthService:
             current_app.logger.error(f"Erro ao registrar usuário no supabase: {str(e)}")
             return False, {'error': 'Erro interno do servidor'}
 
-    def login(self, username: str, password: str) -> Tuple[bool, Dict[str, Any]]:
+    def login(self, email: str, password: str) -> Tuple[bool, Dict[str, Any]]:
         """Realiza login do usuário"""
         try:
-            user_data = self.user_model.authenticate(username, password)
+            user_data = self.user_model.authenticate(email, password)
             if not user_data:
                 return False, {'error': 'Credenciais inválidas'}
 
-            grace_days = current_app.config.get('SUBSCRIPTION_GRACE_DAYS', 3)
-            if not self.user_model.is_subscription_valid(user_data['id'], grace_days):
-                return False, {
-                    'error': 'Assinatura expirada',
-                    'code': 'SUBSCRIPTION_EXPIRED',
-                    'subscription_end': user_data['subscription_end_date']
-                }
-
-            token_data = self.jwt_handler.generate_token(user_data)
-
             self.token_model.store_token(
-                user_id=user_data['id'],
-                token_id=token_data['token_id'],
-                expires_at=token_data['expires_at']
+                user_id=user_data.user.id,
+                token_id=user_data.user.id,
+                expires_at=user_data.session.expires_at
             )
 
             return True, {
                 'message': 'Login realizado com sucesso',
-                'token': token_data['token'],
-                'expires_in': token_data['expires_in'],
+                'token': user_data.session.access_token,
+                'expires_in': 86400,
                 'user': {
-                    'id': user_data['id'],
-                    'username': user_data['username'],
-                    'email': user_data['email'],
-                    'subscription_end': user_data['subscription_end_date']
+                    'id': user_data.user.id,
+                    'email': user_data.user.email,
+                    'created_at': user_data.user.created_at
                 }
             }
         except Exception as e:

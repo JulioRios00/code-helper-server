@@ -74,11 +74,16 @@ class User:
                 raise ValueError("Usuário ou email já existe")
             raise ValueError(f"Erro ao criar usuário: {str(e)}")
 
-    def authenticate(self, username: str, password: str) -> Optional[Dict[str, Any]]:
-        password_hash = self.hash_password(password)
+    def authenticate(self, email: str, password: str) -> Optional[Dict[str, Any]]:
         conn = self.db.get_connection()
-        res = conn.table("users").select("*").eq("username", username).eq("password_hash", password_hash).eq("is_active", True).execute()
-        return res.data[0] if res.data else None
+        response = conn.auth.sign_in_with_password(
+            {
+                "email": email,
+                "password": password
+            
+            }
+        )
+        return response if response else None
 
     def get_user_by_id(self, user_id: int) -> Optional[Dict[str, Any]]:
         conn = self.db.get_connection()

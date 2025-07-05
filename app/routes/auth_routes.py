@@ -57,7 +57,7 @@ def register():
         password = data.get('password', '')
         
         auth_service = AuthService()
-        
+
         auth_service.register_user(
             name=name,
             surname=surname,
@@ -99,7 +99,7 @@ def login():
         password = data.get('password', '')
         
         if not email or not password:
-            return jsonify({'error': 'Email e password are required'}), 400
+            return jsonify({'error': 'Email and password are required'}), 400
         
         auth_service = AuthService()
         success, result = auth_service.login(email, password)
@@ -107,9 +107,9 @@ def login():
         if success:
             return jsonify(result), 200
         else:
-            if result.get('code') == 'SUBSCRIPTION_EXPIRED':
-                return jsonify(result), 402
-            else:
+            #if result.get('code') == 'SUBSCRIPTION_EXPIRED':
+                #return jsonify(result), 402
+            #else:
                 return jsonify(result), 401
                 
     except Exception as e:
