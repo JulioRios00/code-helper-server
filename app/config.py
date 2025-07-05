@@ -24,7 +24,7 @@ class DevelopmentConfig(Config):
     TESTING = False
     SUPABASE_URL = os.environ.get('SUPABASE_URL') or 'https://ozbafgaynzaaphyofswv.supabase.co'
     SUPABASE_KEY = os.environ.get('SUPABASE_KEY') or 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96YmFmZ2F5bnphYXBoeW9mc3d2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE2NTY0NTIsImV4cCI6MjA2NzIzMjQ1Mn0.4nrCF5VgAL9auS-SVYzvxJRiIPqRUI8El6D-56gbbOQ'
-    
+    SUPABASE_SIGNIN = os.environ.get('SUPABASE_SIGNIN') or "/auth/v1/signup"
 
 class ProductionConfig(Config):
     """Configurações para produção"""

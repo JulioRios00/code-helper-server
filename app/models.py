@@ -16,23 +16,25 @@ class DatabaseManager:
 
 
 class User:
-    def __init__(self, db: DatabaseManager):
+    def __init__(self, db: DatabaseManager, supabase_signin: str):
         self.db = db
+        self.supabase_signin = supabase_signin
 
     @staticmethod
     def hash_password(password: str) -> str:
         return hashlib.sha256(password.encode()).hexdigest()
 
-    def create_user(self, username: str, email: str, password: str, subscription_months: int = 1) -> Dict[str, Any]:
+    def create_user(self, name: str, surname: str, email: str, password: str) -> Dict[str, Any]:
         password_hash = self.hash_password(password)
-        subscription_end = datetime.now() + timedelta(days=30 * subscription_months)
+        #subscription_end = datetime.now() + timedelta(days=30 * subscription_months)
 
         try:
             data = {
-                "username": username,
+                "name": name,
+                "surname": surname,
                 "email": email,
                 "password_hash": password_hash,
-                "subscription_end_date": subscription_end.isoformat(),
+                #"subscription_end_date": subscription_end.isoformat(),
                 "is_active": True,
                 "updated_at": datetime.now().isoformat(),
                 "created_at": datetime.now().isoformat()
@@ -45,6 +47,30 @@ class User:
         except Exception as e:
             error_str = str(e).lower()
             if "duplicate" in error_str or "unique" in error_str:
+                raise ValueError("Usuário ou email já existe")
+            raise ValueError(f"Erro ao criar usuário: {str(e)}")
+        
+    def create_user_in_supabase(self, email: str, password: str) -> Dict[str, Any]:
+
+        try:
+            conn = self.db.get_connection()
+            response = conn.auth.sign_up({
+            "email": email,
+            "password": password
+        })
+
+            if response.user:
+                return {
+                    "id": response.user.id,
+                    "email": response.user.email,
+                    "created_at": response.user.created_at
+                }
+            else:
+                raise ValueError("Erro ao criar usuário: resposta inesperada")
+
+        except Exception as e:
+            error_str = str(e).lower()
+            if "user already registered" in error_str or "duplicate" in error_str:
                 raise ValueError("Usuário ou email já existe")
             raise ValueError(f"Erro ao criar usuário: {str(e)}")
 

@@ -12,21 +12,24 @@ class AuthService:
     def __init__(self):
         supabase_url = current_app.config.get('SUPABASE_URL')
         supabase_key = current_app.config.get('SUPABASE_KEY')
+        supabase_signin = current_app.config.get('SUPABASE_SIGNIN')
 
-        if not supabase_url or not supabase_key:
+        if not supabase_url or not supabase_key or not supabase_signin:
             raise RuntimeError("SUPABASE_URL e SUPABASE_KEY devem estar definidos nas configurações.")
 
         self.db_manager = DatabaseManager(supabase_url, supabase_key)
-        self.user_model = User(self.db_manager)
+        self.user_model = User(self.db_manager, supabase_signin)
         self.token_model = Token(self.db_manager)
         self.jwt_handler = JWTHandler()
 
-    def register_user(self, username: str, email: str, password: str,
-                      subscription_months: int = 1) -> Tuple[bool, Dict[str, Any]]:
+    def register_user(self, name: str, surname: str, email: str, password: str,) -> Tuple[bool, Dict[str, Any]]:
         """Registra um novo usuário"""
         try:
-            if not username or len(username) < 3:
+            if not name or len(name) < 3:
                 return False, {'error': 'Nome de usuário deve ter pelo menos 3 caracteres'}
+            
+            if not surname or len(surname) < 3:
+                return False, {'error': 'Sobrenome deve ter pelo menos 3 caracteres'}
 
             if not email or '@' not in email:
                 return False, {'error': 'Email inválido'}
@@ -35,10 +38,10 @@ class AuthService:
                 return False, {'error': 'Senha deve ter pelo menos 6 caracteres'}
 
             user_data = self.user_model.create_user(
-                username=username,
+                name=name,
+                surname=surname,
                 email=email,
-                password=password,
-                subscription_months=subscription_months
+                password=password
             )
 
             return True, {
@@ -51,6 +54,32 @@ class AuthService:
         except Exception as e:
             # Loga o erro para debug
             current_app.logger.error(f"Erro ao registrar usuário: {str(e)}")
+            return False, {'error': 'Erro interno do servidor'}
+        
+    def register_user_in_supabase(self, email: str, password: str) -> Tuple[bool, Dict[str, Any]]:
+        """Registra um novo usuário no supabase"""
+        try:
+            if not email or '@' not in email:
+                return False, {'error': 'Email inválido'}
+
+            if not password or len(password) < 6:
+                return False, {'error': 'Senha deve ter pelo menos 6 caracteres'}
+            
+            supabase_user_data = self.user_model.create_user_in_supabase(
+                email=email,
+                password=password
+            )
+
+            return True, {
+                'message': 'Usuário criado com sucesso no supabase',
+                'user': supabase_user_data
+            }
+
+        except ValueError as e:
+            return False, {'error': str(e)}
+        except Exception as e:
+            # Loga o erro para debug
+            current_app.logger.error(f"Erro ao registrar usuário no supabase: {str(e)}")
             return False, {'error': 'Erro interno do servidor'}
 
     def login(self, username: str, password: str) -> Tuple[bool, Dict[str, Any]]:
