@@ -28,7 +28,8 @@ class JWTHandler:
         # Payload do token
         payload = {
             'user_id': user_data['id'],
-            'username': user_data['username'],
+            'name': user_data['name'],
+            'surname': user_data['surname'],
             'email': user_data['email'],
             'token_id': token_id,
             'iat': datetime.utcnow(),  # Issued at

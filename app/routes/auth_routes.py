@@ -40,10 +40,10 @@ def register():
     
     Body:
     {
-        "username": "string",
-        "email": "string", 
-        "password": "string",
-        "subscription_months": 1 (opcional)
+        "name": "STRING",
+        "surname": "STRING",
+        "email": "STRING",
+        "password": "STRING"
     }
     """
     try:
@@ -51,17 +51,23 @@ def register():
         if not data:
             return jsonify({'error': 'Dados JSON necessários'}), 400
         
-        username = data.get('username', '').strip()
+        name = data.get('name', '').strip()
+        surname = data.get('surname', '').strip()
         email = data.get('email', '').strip()
         password = data.get('password', '')
-        subscription_months = data.get('subscription_months', 1)
         
         auth_service = AuthService()
-        success, result = auth_service.register_user(
-            username=username,
+
+        auth_service.register_user(
+            name=name,
+            surname=surname,
             email=email,
-            password=password,
-            subscription_months=subscription_months
+            password=password
+        )
+
+        success, result = auth_service.register_user_in_supabase(
+            email=email,
+            password=password
         )
         
         if success:
@@ -93,7 +99,7 @@ def login():
         password = data.get('password', '')
         
         if not email or not password:
-            return jsonify({'error': 'Email e password are required'}), 400
+            return jsonify({'error': 'Email and password are required'}), 400
         
         auth_service = AuthService()
         success, result = auth_service.login(email, password)
@@ -101,9 +107,9 @@ def login():
         if success:
             return jsonify(result), 200
         else:
-            if result.get('code') == 'SUBSCRIPTION_EXPIRED':
-                return jsonify(result), 402
-            else:
+            #if result.get('code') == 'SUBSCRIPTION_EXPIRED':
+                #return jsonify(result), 402
+            #else:
                 return jsonify(result), 401
                 
     except Exception as e:
