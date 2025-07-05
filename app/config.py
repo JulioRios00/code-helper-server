@@ -6,7 +6,7 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'sua-chave-secreta-super-segura-aqui'
     
     # Configurações do JWT
-    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'jwt-chave-secreta-super-segura'
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'HkgxsehyyHdPT4pWxzGFuFedVXvAZoZHyaxNv6nOntrl0PWlbAi3s9hNv2zFaYB+e2VRmzcNvqI2TZ+6o0iMtg=='
     JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=24)  # Token expira em 24 horas
     
     SUPABASE_URL = os.environ.get('SUPABASE_URL') or 'https://ozbafgaynzaaphyofswv.supabase.co'
@@ -25,6 +25,7 @@ class DevelopmentConfig(Config):
     SUPABASE_URL = os.environ.get('SUPABASE_URL') or 'https://ozbafgaynzaaphyofswv.supabase.co'
     SUPABASE_KEY = os.environ.get('SUPABASE_KEY') or 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96YmFmZ2F5bnphYXBoeW9mc3d2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE2NTY0NTIsImV4cCI6MjA2NzIzMjQ1Mn0.4nrCF5VgAL9auS-SVYzvxJRiIPqRUI8El6D-56gbbOQ'
     SUPABASE_SIGNIN = os.environ.get('SUPABASE_SIGNIN') or "/auth/v1/signup"
+    JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY') or 'HkgxsehyyHdPT4pWxzGFuFedVXvAZoZHyaxNv6nOntrl0PWlbAi3s9hNv2zFaYB+e2VRmzcNvqI2TZ+6o0iMtg=='
 
 class ProductionConfig(Config):
     """Configurações para produção"""

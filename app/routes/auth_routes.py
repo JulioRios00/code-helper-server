@@ -1,11 +1,9 @@
 from flask import Blueprint, request, jsonify, current_app
 from functools import wraps
 from typing import Dict, Any
-
 from app.services.auth_service import AuthService
 from app.utils.jwt_handler import JWTHandler
 
-# Blueprint para rotas de autenticação
 auth_bp = Blueprint('auth', __name__)
 
 def require_auth(f):
@@ -58,18 +56,19 @@ def register():
         
         auth_service = AuthService()
 
+        success, result = auth_service.register_user_in_supabase(
+            email=email,
+            password=password
+        )
+
         auth_service.register_user(
+            user_id=result['user']['id'],
             name=name,
             surname=surname,
             email=email,
             password=password
         )
 
-        success, result = auth_service.register_user_in_supabase(
-            email=email,
-            password=password
-        )
-        
         if success:
             return jsonify(result), 201
         else:
